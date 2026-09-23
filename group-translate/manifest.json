@@ -337,6 +337,36 @@
           "title": "喺新群組介紹呢個機械人"
         }
       }
+    },
+    "hi": {
+      "name": "ग्रुप ऑटो-अनुवाद",
+      "description": "लिब्रेट्रांसलेट (LibreTranslate) बैकएंड के माध्यम से प्रतिभागियों की भाषाओं के बीच ग्रुप संदेशों का ऑटो-अनुवाद करता है। /tr कमांड के साथ इन-चैट कॉन्फ़िगर करें। एडमिन-गेटेड; सक्षम किए जाने तक अक्षम।",
+      "config": {
+        "libretranslateUrl": {
+          "title": "LibreTranslate URL"
+        },
+        "libretranslateApiKey": {
+          "title": "LibreTranslate API कुंजी"
+        },
+        "timeoutMs": {
+          "title": "अनुवाद टाइमआउट (ms)"
+        },
+        "commandPrefix": {
+          "title": "कमांड प्रीफिक्स"
+        },
+        "minLength": {
+          "title": "अनुवाद करने के लिए संदेश की न्यूनतम लंबाई"
+        },
+        "maxLength": {
+          "title": "अनुवाद करने के लिए संदेश की अधिकतम लंबाई"
+        },
+        "denyReply": {
+          "title": "अस्वीकृत कमांड पर रिप्लाई करें"
+        },
+        "announceInGroups": {
+          "title": "नए ग्रुप्स में इस बॉट की घोषणा करें"
+        }
+      }
     }
   }
 }
