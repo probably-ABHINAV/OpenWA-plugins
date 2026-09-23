@@ -1,0 +1,80 @@
+{
+  "id": "ai-responder",
+  "name": "AI Responder",
+  "version": "0.1.0",
+  "type": "extension",
+  "main": "dist/index.js",
+  "description": "Auto-replies to inbound messages using an OpenAI-compatible Chat Completions API.",
+  "author": "Yudhi Armyndharis <yudhi@rmyndharis.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/rmyndharis/OpenWA-plugins/tree/main/ai-responder",
+  "repository": "https://github.com/rmyndharis/OpenWA-plugins",
+  "keywords": ["ai", "openai", "auto-reply", "llm", "whatsapp", "openwa"],
+  "status": "stable",
+  "minOpenWAVersion": "0.7.0",
+  "testedOpenWAVersion": "0.23.4",
+  "provides": ["ai-auto-reply"],
+  "permissions": [
+    "net:fetch",
+    "storage:use",
+    "messages:send"
+  ],
+  "net": {
+    "allow": [],
+    "allowConfigHosts": ["apiBaseUrl"]
+  },
+  "sessionScoped": true,
+  "sessions": ["*"],
+  "hooks": ["message:received"],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "apiBaseUrl": {
+        "type": "string",
+        "default": "https://api.openai.com/v1",
+        "title": "API Base URL",
+        "required": true,
+        "description": "Base URL of the OpenAI-compatible API. Its host is automatically allowed for outbound requests."
+      },
+      "apiKey": {
+        "type": "string",
+        "secret": true,
+        "required": true,
+        "title": "API Key",
+        "description": "Bearer token for the API."
+      },
+      "model": {
+        "type": "string",
+        "default": "gpt-4o-mini",
+        "title": "Model",
+        "required": true,
+        "description": "The LLM model to request from the API."
+      },
+      "systemPrompt": {
+        "type": "textarea",
+        "title": "System Prompt",
+        "description": "Optional instructions to guide the model's behavior and tone."
+      },
+      "maxRepliesPerChatPerHour": {
+        "type": "number",
+        "default": 20,
+        "min": 1,
+        "title": "Max Replies / Chat / Hour",
+        "description": "Cost safeguard: limits how many times the AI can reply per chat per hour."
+      }
+    }
+  },
+  "i18n": {
+    "en": {
+      "name": "AI Responder",
+      "description": "Auto-replies to inbound messages using an OpenAI-compatible Chat Completions API.",
+      "config": {
+        "apiBaseUrl": { "title": "API Base URL" },
+        "apiKey": { "title": "API Key" },
+        "model": { "title": "Model" },
+        "systemPrompt": { "title": "System Prompt" },
+        "maxRepliesPerChatPerHour": { "title": "Max Replies / Chat / Hour" }
+      }
+    }
+  }
+}
