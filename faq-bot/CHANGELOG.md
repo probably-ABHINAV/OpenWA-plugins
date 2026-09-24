@@ -8,6 +8,26 @@ The version here always matches `manifest.json`'s `version`.
 
 ## [Unreleased]
 
+## [0.2.12] - 2026-09-24
+
+### Fixed
+
+- **A message older than five minutes is no longer answered.** From OpenWA 0.23.6 a Baileys session
+  delivers what WhatsApp queued during a disconnect, so a long outage ended in a burst of rule answers
+  and fallback replies quoting old messages.
+
+## [0.2.11] - 2026-09-23
+
+### Fixed
+
+- **Catalog orders and shared product cards no longer match a rule or draw the fallback reply.** From
+  OpenWA 0.23.5 a Baileys session carries the order note or product title in the body; they are now
+  refused like contact cards and polls, so the event passes down the chain.
+
+### Changed
+
+- **Verified against OpenWA v0.23.6** (testedOpenWAVersion 0.23.4 -> 0.23.6).
+
 ## [0.2.10] - 2026-09-06
 
 ### Changed

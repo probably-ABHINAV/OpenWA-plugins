@@ -12,6 +12,11 @@ const PLUGIN = 'http-action';
 const REPLY_MAX = 4000;
 const DEFAULT_NOT_FOUND = 'Not found.';
 const DEFAULT_ERROR = 'Service is temporarily unavailable. Please try again later.';
+const LATE_NOTICE = 'This command arrived late and was not run. Please send it again if you still need it.';
+// From OpenWA 0.23.6 a Baileys session delivers, after it reconnects, what WhatsApp queued while it was
+// disconnected, each message with its original send time. Five minutes is far above clock skew between
+// WhatsApp and the gateway and matches the host's own auto-reply age limit.
+const LATE_AFTER_MS = 5 * 60_000;
 
 // Responder band, first: a command prefix is the most specific trigger any of these plugins has, so a
 // message addressed to it should never also be answered by a keyword bot or a flow.
@@ -71,9 +76,10 @@ function buildCtx(msg: IncomingMessage, sessionId: string, args: string[], respo
 }
 
 /**
- * Per-message work: match → dedup CHECK (fail-closed) → cooldown (fail-open) → fetch → map status →
- * render → send → mark seen. The dedup MARK is written only after a successful send, so a transient send
- * failure retries on redelivery instead of being silently dropped (mirrors chatwoot's hasSeen/markSeen).
+ * Per-message work: match → dedup CHECK (fail-closed) → late-POST refusal → cooldown (fail-open) →
+ * fetch → map status → render → send → mark seen. The dedup MARK is written only after a successful
+ * send, so a transient send failure retries on redelivery instead of being silently dropped (mirrors
+ * chatwoot's hasSeen/markSeen).
  */
 export async function handleMessage(deps: HandleDeps, sessionId: string, msg: IncomingMessage): Promise<void> {
   const hit = matchAction(deps.cfg.actions, msg.body);
@@ -88,6 +94,21 @@ export async function handleMessage(deps: HandleDeps, sessionId: string, msg: In
   void prune(deps.storage, deps.now(), DEDUP_TTL_MS, PRUNE_INTERVAL_MS).catch((e) =>
     deps.logger.error(`${PLUGIN}: prune failed`, e),
   );
+  // A late POST is refused rather than run: a write the contact sent before an outage (and may have given
+  // up on, or done another way) would otherwise fire now. A GET only reads and still runs. A missing,
+  // zero, negative or unrepresentable timestamp counts as sent now. After the dedup read, so a redelivery
+  // of a command that already ran is never told it did not; before the cooldown, so the notice does not
+  // hold back a fresh command.
+  const sent = new Date((msg.timestamp ?? 0) * 1000);
+  const ageMs = sent.getTime() > 0 ? deps.now() - sent.getTime() : 0;
+  if (hit.action.request.method === 'POST' && ageMs > LATE_AFTER_MS) {
+    deps.logger.warn(`${PLUGIN}: action '${hit.action.id}' not run, the command arrived late`,
+      { ageSeconds: Math.round(ageMs / 1000) });
+    // Send-then-mark, as for the reply below: a failed notice stays un-marked and a redelivery retries it.
+    await deps.conversations.send({ sessionId, chatId: msg.chatId, type: 'text', text: LATE_NOTICE, replyTo: msg.id });
+    await markSeen(deps.storage, sessionId, msg.id, deps.now());
+    return;
+  }
   // Cooldown (fail-open): one reply per chat per window. Checked before the mark so a blocked message
   // consumes nothing and a later message (after the window) still goes through.
   const cooldownMs = Math.max(0, deps.cfg.cooldownSeconds) * 1000;
@@ -167,12 +188,18 @@ export default class HttpActionPlugin implements IPlugin {
       if (typeof msg.body !== 'string' || !msg.body.trim()) return { continue: true };
       if (!msg.chatId || !msg.id) return { continue: true };
       // Since host 0.23.2 a poll arrives with its question as the body and a contact card with its
-      // vCard, so a non-empty body no longer means someone typed a command. This plugin performs real
-      // writes against the operator's backend, so an accidental trigger is the most expensive one in
-      // the catalog: a poll titled with a configured prefix would fire a GET or POST and claim the
-      // message. 'unknown' stays admitted; a tapped business button is a legitimate way to invoke an
-      // action.
-      if (msg.type === 'contact' || msg.type === 'poll') return { continue: true };
+      // vCard, and from 0.23.5 a Baileys 'order' carries the order note (else its title) and a
+      // 'product' the product card text (else the product title), so a non-empty body no longer means
+      // someone typed a command. This plugin performs real writes against the operator's backend, so
+      // an accidental trigger is the most expensive one in the catalog: a poll titled with a
+      // configured prefix would fire a GET or POST and claim the message. 'unknown' stays admitted:
+      // whatsapp-web.js still delivers a tapped business button or list reply there (Baileys sends
+      // them as 'text' from 0.23.6), and that is a legitimate way to invoke an action. A Baileys
+      // whole-catalog share is 'unknown' too, with the catalog title as the body, and cannot be told
+      // apart from a button reply by type.
+      if (msg.type === 'contact' || msg.type === 'poll' || msg.type === 'order' || msg.type === 'product') {
+        return { continue: true };
+      }
 
       // Re-read config per event so a live dashboard edit is picked up without re-enable.
       let liveCfg: HttpActionConfig;

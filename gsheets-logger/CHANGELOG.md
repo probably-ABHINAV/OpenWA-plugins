@@ -8,6 +8,24 @@ The version here always matches `manifest.json`'s `version`.
 
 ## [Unreleased]
 
+## [0.3.11] - 2026-09-24
+
+### Fixed
+
+- Message rows carry the message's own send time instead of the time the plugin handled it, so a
+  message delivered after a reconnect is logged at the time it was sent. Ack and failure rows keep
+  the handling time.
+
+## [0.3.10] - 2026-09-23
+
+### Changed
+
+- README: on Baileys, button, template and list replies log as `text` from OpenWA 0.23.6; orders and
+  product cards log as `order` and `product` from 0.23.5.
+- README: inbound messages on a chat another plugin holds in a `human` or `closed` handover are not
+  logged.
+- **Verified against OpenWA v0.23.6** (testedOpenWAVersion 0.23.4 -> 0.23.6).
+
 ## [0.3.9] - 2026-09-05
 
 ### Fixed

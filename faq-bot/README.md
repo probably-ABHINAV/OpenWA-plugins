@@ -14,13 +14,13 @@
 | Field | Value |
 | ----- | ----- |
 | **Identifier** | `faq-bot` |
-| **Version** | 0.2.10 |
-| **Released** | 2026-09-06 |
+| **Version** | 0.2.12 |
+| **Released** | 2026-09-24 |
 | **Status** | stable |
 | **Author** | Yudhi Armyndharis |
 | **License** | MIT |
 | **Type** | `extension` |
-| **Requires OpenWA** | ≥ 0.6.1 (tested 0.23.4) |
+| **Requires OpenWA** | ≥ 0.6.1 (tested 0.23.6) |
 | **Keywords** | faq, auto-reply, chatbot, support, whatsapp, openwa |
 | **Repository** | [OpenWA-plugins/faq-bot](https://github.com/rmyndharis/OpenWA-plugins/tree/main/faq-bot) |
 <!-- END DETAILS -->
@@ -91,7 +91,17 @@ on v0.6.0/v0.6.1 a disable + re-enable is needed after changing rules.
 
 Shared contact cards and polls never match a rule and never draw `fallbackReply`: from OpenWA 0.23.2
 both carry text in the message body, and a vCard is free text that matches ordinary `contains` and
-`regex` rules by accident. Tapped business buttons and list replies are still answered.
+`regex` rules by accident. Catalog orders and shared product cards are refused the same way: from
+OpenWA 0.23.5 a Baileys session carries the order note or product title in the body. Tapped business
+buttons and list replies are still answered. A Baileys whole-catalog share arrives as type `unknown`
+with the catalog title as its body, so it can still match a rule or draw the fallback.
+
+A message is answered only within five minutes of when it was sent. From OpenWA 0.23.6 a Baileys
+session delivers the messages WhatsApp queued during a disconnect once it reconnects; after a longer
+outage those are left unanswered instead of drawing a burst of replies, quoted to old messages, into
+chats that may already have been answered from the phone. One that matches a rule is still claimed, so
+no other bot answers it; one that matches nothing passes down the chain. The age is measured against
+the gateway's clock, so keep it in sync.
 
 ### Per-session config
 

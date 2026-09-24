@@ -52,6 +52,13 @@ const HOOK_PRIORITY = 80;
 // when they match the same rule.
 const MATCHED_REPLY_COOLDOWN_MS = 10_000;
 
+// A message sent longer ago than this is never answered. From OpenWA 0.23.6 a Baileys session delivers,
+// after it reconnects, what WhatsApp queued while it was disconnected, each message with its original send
+// time, so a long outage ended in a burst of canned replies quoting old messages, often in chats already
+// answered from the phone. Five minutes is far above clock skew between WhatsApp and the gateway and
+// matches the host's own auto-reply age limit.
+const LATE_AFTER_MS = 5 * 60_000;
+
 export default class FaqBot implements IPlugin {
   private readonly fallbackAt = new Map<string, number>();
   /** `${sessionId}:${chatId}:${pattern}` -> last answer for that rule, for MATCHED_REPLY_COOLDOWN_MS. */
@@ -91,11 +98,14 @@ export default class FaqBot implements IPlugin {
     // could actually handle media. chat-flow guards the same way.
     if (m.fromMe || typeof m.body !== 'string' || !m.body.trim() || !m.chatId || !m.id) return false;
     // Since host 0.23.2 a shared contact card arrives with its full vCard as the body and a poll with
-    // its question, so a non-empty body no longer means a human typed it. A vCard is free text (name,
+    // its question, and since 0.23.5 a Baileys 'order' carries the order note and a 'product' card the
+    // product title, so a non-empty body no longer means a human typed it. A vCard is free text (name,
     // org, notes, numbers) and readily matches a `contains` or `regex` rule; with `fallbackReply` set,
     // an unmatched card would answer and claim the event. 'unknown' stays admitted: business button and
-    // list replies land there and are real answers to a question this bot asked.
-    if (m.type === 'contact' || m.type === 'poll') return false;
+    // list replies land there on whatsapp-web.js (Baileys delivers them as 'text' from 0.23.6, as
+    // 'unknown' before) and are real answers to a question this bot asked. A Baileys whole-catalog share
+    // also arrives as 'unknown' with the catalog title as the body, and cannot be told apart from those.
+    if (m.type === 'contact' || m.type === 'poll' || m.type === 'order' || m.type === 'product') return false;
 
     // Re-parse per event so a per-session config override (resolved by the host for this hook fire) is
     // honored — a snapshot cached at enable would ignore overrides set via the dashboard after enable.
@@ -118,6 +128,9 @@ export default class FaqBot implements IPlugin {
 
     const sessionId = hook.sessionId;
     const rule = matchRule(cfg.rules, m.body);
+    // `timestamp` is unix seconds; a missing, zero, negative or unrepresentable one counts as sent now.
+    const sent = new Date((m.timestamp ?? 0) * 1000);
+    const late = sent.getTime() > 0 && Date.now() - sent.getTime() > LATE_AFTER_MS;
     try {
       if (rule) {
         // Keyed on the INBOUND TEXT, not on the rule. A runaway exchange repeats the same message: the
@@ -125,8 +138,9 @@ export default class FaqBot implements IPlugin {
         // reply arrives again. Keying on the rule instead would have suppressed a customer's second,
         // genuinely different question whenever it happened to match the same rule ("berapa harga paket
         // A?" then "kalau harga paket B?"), which costs far more than the loop it prevents.
-        // Claimed either way: the message matched a rule, so it is this plugin's, and the standard
-        // allows a claim to resolve to silence.
+        // Claimed either way, too old to answer included: the message matched a rule, so it is this
+        // plugin's, and the standard allows a claim to resolve to silence.
+        if (late) return true;
         const key = `${sessionId}:${m.chatId}:${m.body.trim().toLowerCase().slice(0, 200)}`;
         if (!allowCooldown(this.matchedAt, key, Date.now(), MATCHED_REPLY_COOLDOWN_MS)) return true;
         try {
@@ -138,7 +152,7 @@ export default class FaqBot implements IPlugin {
         }
         return true;
       }
-      if (cfg.config.fallbackReply) {
+      if (cfg.config.fallbackReply && !late) {
         const key = `${sessionId}:${m.chatId}`;
         const cooldownMs = Math.max(0, cfg.config.fallbackCooldownSec) * 1000;
         if (allowCooldown(this.fallbackAt, key, Date.now(), cooldownMs)) {
