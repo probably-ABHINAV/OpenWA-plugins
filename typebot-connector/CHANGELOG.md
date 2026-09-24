@@ -6,6 +6,39 @@ All notable changes to the Typebot Connector plugin are documented here. The for
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-24
+
+### Added
+
+- An optional file-upload step can be skipped from WhatsApp by replying with its Skip label.
+- A file-upload step sends its placeholder as the prompt when it is plain text, as a text step already
+  does.
+
+### Fixed
+
+- Messages WhatsApp delivers late after a reconnect no longer answer a step the contact had not seen yet.
+- A reply written during a disconnect to a step shown before it still answers it: the idle reset counts
+  from when it was written.
+- An attachment that did not come through at a file-upload step no longer invites a typed answer.
+
+## [0.2.10] - 2026-09-24
+
+### Fixed
+
+- A file-upload step no longer invites a typed answer: Typebot accepts only the file there, so the
+  prompt promised a reply the connector then refused.
+
+## [0.2.9] - 2026-09-23
+
+### Fixed
+
+- A catalog order or product card now asks the contact to type instead of answering the current step,
+  since from OpenWA 0.23.5 its note or title fills the body on Baileys and could pick a numbered choice.
+
+### Changed
+
+- **Verified against OpenWA v0.23.6** (testedOpenWAVersion 0.23.4 -> 0.23.6).
+
 ## [0.2.8] - 2026-09-05
 
 ### Fixed

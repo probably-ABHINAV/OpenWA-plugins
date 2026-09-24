@@ -98,10 +98,14 @@ export default class ChatFlow implements IPlugin {
     // from sibling auto-repliers.
     if (m.fromMe || typeof m.body !== 'string' || !m.body.trim() || !m.chatId || !m.id) return { continue: true };
     // The type denylist drops what DOES carry text but was never typed at this menu. Since host 0.23.2
-    // a shared contact card arrives with its full vCard as the body and a poll with its question, so
-    // body alone no longer means "a human typed this". 'unknown' is deliberately admitted: business
-    // button and list replies land there, and a tapped menu button is exactly what this plugin wants.
-    if (m.type === 'contact' || m.type === 'poll') return { continue: true };
+    // a shared contact card arrives with its full vCard as the body and a poll with its question, and
+    // on Baileys from 0.23.5 an 'order' carries its order note and a 'product' card its product title,
+    // so body alone no longer means "a human typed this". 'unknown' is deliberately admitted: business
+    // button and list replies land there on whatsapp-web.js (Baileys sends them as 'text' from 0.23.6),
+    // and a tapped menu button is exactly what this plugin wants.
+    if (m.type === 'contact' || m.type === 'poll' || m.type === 'order' || m.type === 'product') {
+      return { continue: true };
+    }
 
     let liveCfg;
     try {
@@ -122,7 +126,7 @@ export default class ChatFlow implements IPlugin {
     try {
       // In a group, scope flow state to the sender so members don't clobber each other's menu position.
       const actor = m.isGroup ? m.author : undefined;
-      const handled = await FlowEngine.processMessage(ctx, liveCfg.flow, hook.sessionId, m.chatId, m.body, m.id, actor);
+      const handled = await FlowEngine.processMessage(ctx, liveCfg.flow, hook.sessionId, m.chatId, m.body, m.id, actor, m.timestamp);
       return { continue: !handled };
     } catch (err) {
       ctx.logger.error('chat-flow: flow processing failed', err);

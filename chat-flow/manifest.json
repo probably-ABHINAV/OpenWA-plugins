@@ -1,7 +1,7 @@
 {
   "id": "chat-flow",
   "name": "Chat Flow",
-  "version": "1.1.8",
+  "version": "1.1.10",
   "type": "extension",
   "main": "dist/index.js",
   "description": "Interactive, stateful auto-reply: a trigger word starts a greeting + numbered menu, replies traverse a configurable menu tree, and per-chat state expires after 15 minutes.",
@@ -20,7 +20,7 @@
   ],
   "status": "stable",
   "minOpenWAVersion": "0.7.0",
-  "testedOpenWAVersion": "0.23.4",
+  "testedOpenWAVersion": "0.23.6",
   "provides": [
     "auto-reply"
   ],
@@ -242,8 +242,8 @@
       }
     },
     "hi": {
-      "name": "चैट फ्लो (Chat Flow)",
-      "description": "इंटरएक्टिव, स्टेटफुल ऑटो-रिप्लाई: एक ट्रिगर शब्द ग्रीटिंग + गिने हुए मेनू को शुरू करता है, रिप्लाई एक कॉन्फ़िगर किए जा सकने वाले मेनू ट्री को पार करते हैं, और प्रति-चैट स्टेट 15 मिनट के बाद समाप्त हो जाता है।",
+      "name": "चैट फ्लो",
+      "description": "इंटरएक्टिव, स्टेटफुल ऑटो-रिप्लाई: एक ट्रिगर शब्द ग्रीटिंग + क्रमांकित मेनू को शुरू करता है, रिप्लाई एक कॉन्फ़िगर किए जा सकने वाले मेनू ट्री में आगे बढ़ते हैं, और प्रति-चैट स्टेट 15 मिनट के बाद समाप्त हो जाता है।",
       "config": {
         "trigger": {
           "title": "ट्रिगर शब्द"

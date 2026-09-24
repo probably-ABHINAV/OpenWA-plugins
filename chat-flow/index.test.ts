@@ -162,12 +162,60 @@ test('a contact card or a poll never reaches the flow engine, but a tapped butto
   assert.equal(poll.continue, true, 'a poll must pass down the chain');
   assert.deepEqual(sent, [], 'neither may start the flow');
 
-  // 'unknown' carries business button and list replies. A tapped menu button is the single most
-  // desirable input a menu bot can get, so it must NOT be denied along with the two above.
+  // 'unknown' carries whatsapp-web.js business button and list replies (Baileys sends them as 'text'
+  // from host 0.23.6). A tapped menu button is the single most desirable input a menu bot can get, so
+  // it must NOT be denied along with the two above.
   await fire('1', 'm3', 'unknown');
   assert.ok(sent.length > 0, 'a tapped button still drives the flow');
   await plugin.onDisable();
 });
+
+// From host 0.23.5 a Baileys catalog order arrives as 'order' with its note (or title) as the body, and
+// a product card as 'product' with its text (or title). Neither was typed at the menu: with the
+// documented empty trigger either started the flow, and mid-flow either drew "Invalid option", spent a
+// miss and claimed the event.
+for (const [label, type, body] of [
+  ['an order', 'order', 'Tolong kirim sore ini'],
+  ['a product card', 'product', 'Kopi Gayo 250g'],
+] as const) {
+  test(`${label} never reaches the flow engine`, async () => {
+    const ChatFlow = (await import('./index.ts')).default;
+    const sent: string[] = [];
+    let handler: ((h: unknown) => Promise<{ continue: boolean }>) | undefined;
+    const store = new Map<string, unknown>();
+    const ctx = {
+      config: { greeting: 'halo', trigger: '', options: [{ key: '1', text: 'satu' }] },
+      logger: { log() {}, debug() {}, warn() {}, error() {} },
+      messages: { sendText: async (_s: string, _c: string, t: string) => { sent.push(t); return { messageId: 'x', timestamp: 0 }; },
+                  reply: async (_s: string, _c: string, _q: string, t: string) => { sent.push(t); return { messageId: 'x', timestamp: 0 }; } },
+      storage: {
+        get: async (k: string) => store.get(k) ?? null,
+        set: async (k: string, v: unknown) => void store.set(k, structuredClone(v)),
+        delete: async (k: string) => void store.delete(k),
+        list: async () => [...store.keys()],
+      },
+      registerHook: (_e: string, h: (x: unknown) => Promise<{ continue: boolean }>) => { handler = h; },
+    } as never;
+
+    const plugin = new ChatFlow();
+    await plugin.onEnable(ctx);
+    const fire = (b: string, id: string, t = 'text') =>
+      handler!({ source: 'Engine', sessionId: 's1', data: { id, chatId: 'c@wa', body: b, type: t, fromMe: false, isGroup: false } });
+
+    const first = await fire(body, 'm1', type);
+    assert.equal(first.continue, true, `${label} must pass down the chain`);
+    assert.deepEqual(sent, [], `${label} must not start the flow`);
+    assert.equal(store.size, 0, `${label} must not open flow state`);
+
+    await fire('halo', 'm2');
+    const before = structuredClone([...store]);
+    const mid = await fire(body, 'm3', type);
+    assert.equal(mid.continue, true, `${label} mid-flow must pass down the chain`);
+    assert.deepEqual(sent, ['halo'], `${label} mid-flow must not draw "Invalid option"`);
+    assert.deepEqual([...store], before, `${label} mid-flow must not spend a miss or move the path`);
+    await plugin.onDisable();
+  });
+}
 
 test('a channel or broadcast post never starts a flow', async () => {
   // A `@newsletter` post arrives flagged as a non-group chat, so the only chat-scope gate let it
@@ -210,4 +258,39 @@ test('a channel or broadcast post never starts a flow', async () => {
   // Guard rail: a real chat under the same config still starts the flow.
   await fire('628123456789@c.us');
   assert.deepEqual(replies, ['menu']);
+});
+
+// From host 0.23.6 a Baileys session delivers, after it reconnects, what the contact sent while it was
+// disconnected. Inside an open flow such a message is claimed without a reply, so neither the menu nor
+// a sibling auto-replier answers something written before the menu it would be matched against.
+test('a late backlog inside an open flow is claimed without a reply', async () => {
+  const ChatFlow = (await import('./index.ts')).default;
+  const sent: string[] = [];
+  let handler: ((h: unknown) => Promise<{ continue: boolean }>) | undefined;
+  const store = new Map<string, unknown>();
+  const ctx = {
+    config: { greeting: 'halo', trigger: '', options: [{ key: '1', text: 'satu' }] },
+    logger: { log() {}, debug() {}, warn() {}, error() {} },
+    messages: { sendText: async (_s: string, _c: string, t: string) => { sent.push(t); return { messageId: 'x', timestamp: 0 }; },
+                reply: async (_s: string, _c: string, _q: string, t: string) => { sent.push(t); return { messageId: 'x', timestamp: 0 }; } },
+    storage: {
+      get: async (k: string) => store.get(k) ?? null,
+      set: async (k: string, v: unknown) => void store.set(k, v),
+      delete: async (k: string) => void store.delete(k),
+      list: async () => [...store.keys()],
+    },
+    registerHook: (_e: string, h: (x: unknown) => Promise<{ continue: boolean }>) => { handler = h; },
+  } as never;
+
+  const plugin = new ChatFlow();
+  await plugin.onEnable(ctx);
+  const hourAgo = Math.floor(Date.now() / 1000) - 3600;
+  const fire = (body: string, id: string) =>
+    handler!({ source: 'Engine', sessionId: 's1',
+      data: { id, chatId: 'c@wa', body, type: 'text', timestamp: hourAgo, fromMe: false, isGroup: false } });
+
+  await fire('halo', 'm1');
+  assert.deepEqual(await fire('ada orang?', 'm2'), { continue: false }, 'claimed inside the open flow');
+  assert.deepEqual(sent, ['halo'], 'only the greeting goes out');
+  await plugin.onDisable();
 });

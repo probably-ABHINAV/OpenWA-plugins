@@ -34,9 +34,25 @@ test('rating prompt, redirect URL, and flow-end (no input) render correctly', ()
   ]);
 });
 
+test('a file step asks for a file and does not invite a typed answer', () => {
+  // Typebot answers typed text at a file input with "Invalid message", so the prompt must not offer it.
+  assert.deepEqual(renderResponse({ bubbles: [], input: { kind: 'file', blockId: 'b' } }), [
+    { type: 'text', text: 'Send a file or photo to continue.' },
+  ]);
+});
+
 test('multi-choice appends a hint; unsupported input has a fallback line', () => {
   const multi = renderResponse({ bubbles: [], input: { kind: 'choice', blockId: 'b', multiple: true, items: [{ id: '1', content: 'A' }] } });
   assert.match(multi[0].type === 'text' ? multi[0].text : '', /pick more than one/);
   const unsupported = renderResponse({ bubbles: [], input: { kind: 'unsupported', blockId: 'b', typeLabel: 'payment input' } });
   assert.match(unsupported[0].type === 'text' ? unsupported[0].text : '', /can't be shown on WhatsApp/);
+});
+
+test("a file step prompts with the author's placeholder and names the skip word when optional", () => {
+  assert.deepEqual(renderResponse({ bubbles: [], input: { kind: 'file', blockId: 'b', placeholder: 'Kirim satu foto sebagai bukti.' } }), [
+    { type: 'text', text: 'Kirim satu foto sebagai bukti.' },
+  ]);
+  assert.deepEqual(renderResponse({ bubbles: [], input: { kind: 'file', blockId: 'b', skipLabel: 'Skip' } }), [
+    { type: 'text', text: 'Send a file or photo to continue.\n\n(Or reply "Skip" to skip this step.)' },
+  ]);
 });

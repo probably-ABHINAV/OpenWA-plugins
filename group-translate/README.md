@@ -14,13 +14,13 @@
 | Field | Value |
 | ----- | ----- |
 | **Identifier** | `group-translate` |
-| **Version** | 1.3.7 |
-| **Released** | 2026-09-05 |
+| **Version** | 1.3.9 |
+| **Released** | 2026-09-24 |
 | **Status** | stable |
 | **Author** | Yudhi Armyndharis |
 | **License** | MIT |
 | **Type** | `extension` |
-| **Requires OpenWA** | ≥ 0.8.0 (tested 0.23.4) |
+| **Requires OpenWA** | ≥ 0.8.0 (tested 0.23.6) |
 | **Keywords** | translation, libretranslate, i18n, groups, whatsapp, openwa |
 | **Repository** | [OpenWA-plugins/group-translate](https://github.com/rmyndharis/OpenWA-plugins/tree/main/group-translate) |
 <!-- END DETAILS -->
@@ -121,6 +121,18 @@ body, which would otherwise send a third party's name and number to your transla
 machine-translated card into the group, and let language detection pin the sender's language from
 vCard field names. Poll questions are translated normally.
 
+Catalog orders and shared product cards are never translated either. From OpenWA 0.23.5 they arrive
+typed `order` and `product` on both engines, and on Baileys they now carry the order note or the
+product title as the body. Earlier hosts deliver both as `unknown`, which the plugin cannot tell apart
+from other messages. On Baileys a share of a whole catalog still arrives as `unknown` with the catalog
+title as its body, and is translated like any other text.
+
+Messages delivered late are not acted on. From OpenWA 0.23.6 a Baileys session delivers, after it
+reconnects, the messages WhatsApp queued while it was disconnected. A message that reaches the plugin
+more than 5 minutes after it was sent is not translated, and a `/tr` command that late is not run,
+though it is still kept from other bots: send it again once the session is back. The check compares
+the message's WhatsApp send time with the gateway's clock, so keep that clock in sync.
+
 ### Per-session config
 
 **Supported, with a caveat.** Every config field may be overridden per WhatsApp session via the
@@ -160,7 +172,10 @@ The API key travels only in the request body to the allow-listed host and is sto
 Commands that change group state are admin-gated via `ctx.engine.getGroupInfo`. When WhatsApp delivers the
 author under its `@lid` privacy id, the plugin resolves that to the author's phone identity through
 `ctx.engine.getContactById` before comparing — resolution widens *recognition*, never permission: an
-author who resolves to someone outside the admin and delegated-controller lists is still refused. The
+author who resolves to someone outside the admin and delegated-controller lists is still refused. If
+WhatsApp does not return the group's admin list, nobody counts as an admin for that command (delegated
+controllers still do), and `denyReply` decides whether the sender is told. A `/tr` command is claimed
+as soon as it is recognized, so no other plugin answers it even when the lookup is slow. The
 per-call timeout (≤ the host hook budget) and circuit breaker keep a slow backend from stalling the host.
 
 ## Changelog

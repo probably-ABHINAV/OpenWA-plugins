@@ -14,13 +14,13 @@
 | Field | Value |
 | ----- | ----- |
 | **Identifier** | `typebot-connector` |
-| **Version** | 0.2.8 |
-| **Released** | 2026-09-05 |
+| **Version** | 0.3.0 |
+| **Released** | 2026-09-24 |
 | **Status** | stable |
 | **Author** | Yudhi Armyndharis |
 | **License** | MIT |
 | **Type** | `extension` |
-| **Requires OpenWA** | ≥ 0.8.2 (tested 0.23.4) |
+| **Requires OpenWA** | ≥ 0.8.2 (tested 0.23.6) |
 | **Keywords** | typebot, chatbot, flow, bot, no-code, two-way, whatsapp, openwa |
 | **Repository** | [OpenWA-plugins/typebot-connector](https://github.com/rmyndharis/OpenWA-plugins/tree/main/typebot-connector) |
 <!-- END DETAILS -->
@@ -34,7 +34,9 @@
   and audio bubbles are sent as media; a `choice` step is shown as a numbered list and the contact's
   numeric reply is mapped back to the option.
 - **Typed inputs validated by Typebot** — email, number, date, … are re-asked on a bad value. A file
-  input step accepts a photo/file the contact sends and uploads it to Typebot.
+  input step accepts a photo/file the contact sends and uploads it to Typebot. Typebot takes only the
+  file there, so typed text is answered with a request for one. A file step marked optional in Typebot
+  is skipped when the contact replies with the step's Skip label ("Skip" unless you renamed it).
 - **Auto-reset** — the session resets when the flow ends or after the idle timeout, so the next message
   starts fresh.
 - **No public URL or webhook** — runs sandboxed in the plugin worker and polls Typebot's live Chat API
@@ -53,6 +55,9 @@ timeout.
 **placeholder is sent to the contact as the prompt**. A placeholder written for a form ("Type here…")
 arrives as a nonsense message; write it as something you would actually say ("Send your order number").
 The same applies to a `choice` step, which arrives as a numbered list the contact answers with a digit.
+A file step's placeholder is its prompt too, but only when it is plain text: Typebot's own default is
+HTML for the web upload box ("Click to upload or drag and drop"), so a placeholder containing markup is
+replaced with "Send a file or photo to continue."
 
 ## Setup
 
@@ -106,13 +111,22 @@ and upload it in the dashboard **Plugins → Install** (or the **Catalog** tab).
   outbound media/voice.
 - **Auto-starts every chat in scope** (including groups by default). Don't run another auto-reply /
   menu / FAQ plugin on the same session — they will conflict.
-- Shared contact cards and polls do not answer the current step. From OpenWA 0.23.2 both carry text in
-  the message body, so a vCard holding a bare in-range digit could otherwise select a numbered choice.
-  The contact is asked to type instead and the flow stays put; sharing a card at a file-upload step
-  still gets that step's own prompt.
+- Shared contact cards, polls, catalog orders and product cards do not answer the current step. From
+  OpenWA 0.23.2 contact cards and polls carry text in the message body, and from 0.23.5 so do Baileys
+  orders (the order note or title) and product cards (the card text or product title), so a bare
+  in-range digit in any of them could otherwise select a numbered choice. The contact is asked to type
+  instead and the flow stays put; sharing a card at a file-upload step still gets that step's own
+  prompt. A whole-catalog share still arrives untyped with the catalog title as its body, which the
+  connector cannot tell apart from a whatsapp-web.js button reply, so it is taken as the answer.
 - **In a group, each participant gets their own flow**, keyed by the sender. A group message the
   engine delivers with no identifiable sender is skipped rather than answered: there is no way to
   tell whose flow it belongs to, and guessing would feed one contact's answer into another's session.
+- **Messages delivered late after a reconnect.** From OpenWA 0.23.6 a Baileys session delivers, after
+  it reconnects, what WhatsApp held while it was disconnected, each message with its original send
+  time. A message written more than 5 minutes before the current step was sent, and delivered more
+  than 5 minutes late, is ignored: the contact had not seen that step. A reply to a step shown before
+  the outage still answers it, and the idle reset counts from when it was written. A backlog under 5
+  minutes old cannot be told apart from fast typing and is handled as live.
 - `payment` steps and non-renderable embeds can't be shown on WhatsApp and get a short fallback
   message. Streaming AI blocks are resolved server-side into normal text bubbles.
 - **Link bubbles look plainer from OpenWA 0.14.0 on the Baileys engine.** A link bubble and a redirect
