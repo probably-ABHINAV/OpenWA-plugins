@@ -5,7 +5,14 @@ export interface ChatCompletionConfig {
   apiKey: string;
   model: string;
   systemPrompt?: string;
+  /** Sent as `max_tokens`; omitted when unset. */
+  maxOutputTokens?: number;
+  /** Fetch budget; unset leaves the host default (15 s). */
+  timeoutMs?: number;
 }
+
+// How much of a provider's error body goes into the thrown message, and so into the log line.
+const ERROR_BODY_MAX = 200;
 
 /**
  * Pure HTTP client for calling OpenAI-compatible Chat Completions.
@@ -26,7 +33,8 @@ export async function fetchChatCompletion(
 
   const payload = JSON.stringify({
     model: config.model,
-    messages
+    messages,
+    ...(config.maxOutputTokens ? { max_tokens: config.maxOutputTokens } : {}),
   });
 
   const response = await fetchFn(url, {
@@ -36,11 +44,14 @@ export async function fetchChatCompletion(
       'Authorization': `Bearer ${config.apiKey}`
     },
     body: payload,
-    timeoutMs: 15000 // Give the LLM 15 seconds max so we don't hold the hook indefinitely
+    timeoutMs: config.timeoutMs,
   });
 
   if (!response.ok) {
-    throw new Error(`AI API failed with status ${response.status}: ${response.body}`);
+    // A provider or a proxy in front of it can echo the key back in an error body. Redact before
+    // slicing, so a key straddling the cut cannot leave a prefix behind.
+    const body = config.apiKey ? response.body.split(config.apiKey).join('***') : response.body;
+    throw new Error(`AI API failed with status ${response.status}: ${body.slice(0, ERROR_BODY_MAX)}`);
   }
 
   let parsed: any;
